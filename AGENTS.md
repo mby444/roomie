@@ -1,3 +1,60 @@
+# Roomie — catatan untuk agent
+
+Aplikasi reservasi dan monitoring ruang kelas. Repo ini masih skeleton Laravel 13 yang kosong: hanya ada `routes/web.php` (`/` → view `welcome`) dan tabel `users`. Semua fitur domain dibangun dari `PRD.md`.
+
+## Baca PRD.md sebelum mengerjakan fitur apa pun
+
+`PRD.md` (bahasa Indonesia) adalah spesifikasi: FR-01..FR-11, data model, kosakata status, dan spesifikasi QR. Bagian 11 "Assumptions dan Open Questions" memuat keputusan yang sudah disepakati — ikuti, jangan diasumsikan ulang:
+
+- Hanya PJ kelas yang boleh reservasi; satu reservasi untuk satu kelas.
+- Reservasi langsung terkonfirmasi, tidak ada approval dan tidak ada status `PENDING`.
+- Durasi diturunkan dari SKS yang diinput setelah scan QR: 1 SKS = 50 menit.
+- Integrasi ESP32 memakai HTTP dan berada di luar scope MVP; status fisik tetap `UNKNOWN` — jangan membuat data sensor palsu hanya agar UI terisi.
+- QR berisi token ruangan yang unik dan sulit ditebak, tanpa kredensial, dan token tidak memberi hak akses apa pun. Untuk testing lokal, URL `localhost` pada QR akan mengarah ke HP pemindai, bukan ke PC pengembang — bangun URL absolut lewat `route()`/`APP_URL`.
+
+## Perintah
+
+- `composer run dev` — satu-satunya jalan dev full-stack: `artisan serve` (port 8000) + `queue:listen --tries=1` + `npm run dev`.
+- `php artisan test --compact` (atau `composer test`, yang juga menjalankan `config:clear`) — persempit dengan path file atau `--filter=` sesuai perubahan.
+- `vendor/bin/pint --dirty` setelah mengubah file PHP.
+- `php artisan make:test --pest Nama` tanpa prefiks suite. `RefreshDatabase` masih dikomentari di `tests/Pest.php`; aktifkan per test saat menambah tes yang menyentuh DB.
+
+## Output tes berupa JSON, bukan teks PHPUnit
+
+`laravel/pao` (dev dependency) mengambil alih output tes begitu mendeteksi agent dan mencetak satu baris JSON. Set `PAO_DISABLE=1` bila membutuhkan output PHPUnit biasa.
+
+## Database dev: MySQL dikonfigurasi tapi tidak jalan
+
+- `.env` mengarah ke MySQL `roomie` di 127.0.0.1:3306 dan tidak ada yang listen di sana. `php artisan migrate`, `db:show`, tinker, dan tool DB Boost gagal dengan `SQLSTATE[HY000] [2002]`. Nyalakan MySQL dulu atau alihkan `.env` ke sqlite — jangan berasumsi migrasi sudah dijalankan.
+- `composer run setup` juga menjalankan `migrate --force`, jadi gagal di clone baru karena alasan yang sama.
+- `phpunit.xml` memaksa `sqlite` `:memory:` untuk tes, jadi query di dalam test harus tetap kompatibel dengan SQLite (hindari SQL khusus MySQL).
+
+## Konvensi Laravel 13 (berbeda dari Laravel lama)
+
+- Model memakai atribut PHP untuk mass assignment: `#[Fillable([...])]` dan `#[Hidden([...])]`; cast ditulis di method `casts(): array`. Lihat `app/Models/User.php` — jangan kembalikan properti `$fillable`/`$casts`.
+- Routing, middleware, dan konfigurasi exception berada di `bootstrap/app.php` (tidak ada `Http/Kernel.php`). Route ada di `routes/web.php`; `routes/api.php` belum ada.
+- Belum ada auth scaffolding, kolom `role`, maupun model/tabel Room, Reservation, RoomSession. Buat dengan `php artisan make:*` mengikuti data model di PRD.
+
+## Frontend
+
+- Blade + Tailwind v4 tanpa `tailwind.config.js`: token tema ada di blok `@theme` pada `resources/css/app.css`. Tambah gaya lewat utility class, jangan membuat file config baru.
+- Font disuntikkan dari `vite.config.js` (`laravel-vite-plugin/fonts` → Bunny "Instrument Sans"); baru tersedia setelah `npm run dev` atau `npm run build`.
+- `.npmrc` menyetel `ignore-scripts=true`, sehingga postinstall tidak berjalan.
+- `/public/build` ada di gitignore: kalau perubahan Blade tampil tanpa CSS, jalankan `npm run build`.
+
+## File hasil generate Boost — jangan diedit manual
+
+Blok `<laravel-boost-guidelines>` di AGENTS.md, `CLAUDE.md` (salinan identik), `.agents/skills/`, `.claude/skills/`, dan `.mcp.json` ditulis oleh `laravel/boost`. Regenerate dengan `php artisan boost:update` (otomatis berjalan setelah `composer update`). Simpan catatan repo hanya di file ini, di atas blok tersebut.
+
+- MCP Boost sudah terhubung di `opencode.json` dan `.mcp.json` (`php artisan boost:mcp`); utamakan tool-nya (`database-schema`, `database-query`, `search-docs`, `get-absolute-url`).
+- Skill yang terpasang di `.agents/skills/`: `laravel-best-practices`, `testing-best-practices`, `tailwindcss-development`, `deploying-to-cloud`, `infer-conventions`. Muat skill yang relevan sebelum menulis kode di domain tersebut.
+- Direktori `.ai/rules/` tidak ada, jadi lewati langkah itu dari pedoman Boost.
+
+## Keputusan yang masih terbuka — tanya, jangan hardcode
+
+- `config/app.php` masih `UTC` sementara PRD mewajibkan `Asia/Jakarta`. Konfirmasi ke user sebelum menambah fitur bertimestamp atau menggeser tanggal secara sepihak.
+- Toleransi keterlambatan check-in dan perlakuan terhadap sesi yang terlupa di-checkout belum diputuskan (PRD §11 butir 6–7).
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
